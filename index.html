@@ -1,0 +1,198 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Siêu AI Lê Xuân Dương - Bản 16x16 Max Defense</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #ffffff; color: #222; margin: 0; padding: 20px; }
+        h1 { color: #1a1a1a; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
+        .info { margin-bottom: 15px; color: #666; font-weight: bold; }
+        
+        #board { 
+            display: grid; 
+            grid-template-columns: repeat(16, 32px); 
+            grid-template-rows: repeat(16, 32px); 
+            gap: 1px; 
+            background-color: #34495e; 
+            border: 4px solid #34495e; 
+            box-shadow: 0 12px 40px rgba(0,0,0,0.2); 
+        }
+        
+        .cell { 
+            width: 32px; height: 32px; 
+            background-color: #fff; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 22px; font-weight: 900; 
+            cursor: pointer; transition: 0.1s; 
+        }
+        .cell:hover { background-color: #ecf0f1; }
+        .cell.x { color: #e74c3c; }
+        .cell.o { color: #2980b9; }
+        .last-move { background-color: #fff59d !important; border-radius: 2px; }
+
+        #status { margin-top: 20px; font-size: 1.4rem; font-weight: bold; color: #2c3e50; min-height: 40px; }
+        button { 
+            padding: 12px 40px; font-size: 1rem; cursor: pointer; border-radius: 30px; 
+            border: none; background-color: #3498db; color: white; font-weight: bold; 
+            transition: 0.3s; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+        }
+        button:hover { background-color: #2980b9; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <h1>Không thể đánh bại Lê Xuân Dương</h1>
+    <div class="info">Kích thước: 16x16 | AI: Chặn 3 hở cực gắt</div>
+    
+    <div id="board"></div>
+    <div id="status">Lượt của bạn (X)</div>
+    
+    <button onclick="resetGame()">Làm ván mới</button>
+
+    <script>
+        const SIZE = 16;
+        let board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+        let gameOver = false;
+        let lastMove = null;
+
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.id = `c-${r}-${c}`;
+                    cell.onclick = () => handleMove(r, c);
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function handleMove(r, c) {
+            if (board[r][c] || gameOver) return;
+            makeMove(r, c, 'X');
+            if (checkWin(r, c, 'X')) {
+                statusElement.innerText = "Bạn đã thắng!";
+                gameOver = true;
+                return;
+            }
+            statusElement.innerText = "AI đang tính toán...";
+            setTimeout(aiMove, 100);
+        }
+
+        function makeMove(r, c, player) {
+            board[r][c] = player;
+            const cell = document.getElementById(`c-${r}-${c}`);
+            cell.innerText = player;
+            cell.classList.add(player.toLowerCase());
+            if (lastMove) document.getElementById(`c-${lastMove.r}-${lastMove.c}`).classList.remove('last-move');
+            cell.classList.add('last-move');
+            lastMove = {r, c};
+        }
+
+        // --- BỘ NÃO AI NÂNG CẤP ---
+        function aiMove() {
+            if (gameOver) return;
+            let bestScore = -1;
+            let move = {r: 8, c: 8};
+
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (!board[r][c] && hasNearby(r, c)) {
+                        let aScore = evaluateMove(r, c, 'O'); 
+                        let dScore = evaluateMove(r, c, 'X');
+
+                        // CẢI TIẾN: Nếu đối thủ có 3 hở 2 đầu, dScore sẽ được đẩy lên rất cao
+                        // để AI bắt buộc phải chặn thay vì đi nước linh tinh.
+                        let totalScore = aScore + dScore;
+
+                        if (totalScore > bestScore) {
+                            bestScore = totalScore;
+                            move = {r, c};
+                        }
+                    }
+                }
+            }
+            makeMove(move.r, move.c, 'O');
+            if (checkWin(move.r, move.c, 'O')) {
+                statusElement.innerText = "Lê Xuân Dương AI thắng!";
+                gameOver = true;
+            } else {
+                statusElement.innerText = "Lượt của bạn!";
+            }
+        }
+
+        function hasNearby(r, c) {
+            for (let i = -1; i <= 1; i++) 
+                for (let j = -1; j <= 1; j++) {
+                    let nr = r + i, nc = c + j;
+                    if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc]) return true;
+                }
+            return false;
+        }
+
+        function evaluateMove(r, c, p) {
+            let total = 0;
+            const directions = [[1,0], [0,1], [1,1], [1,-1]];
+            
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                let blocks = 0;
+                
+                // Quét 2 hướng để tìm chuỗi
+                for (let side = -1; side <= 1; side += 2) {
+                    for (let i = 1; i < 5; i++) {
+                        let nr = r + (dr * i * side), nc = c + (dc * i * side);
+                        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) { blocks++; break; }
+                        if (board[nr][nc] === p) count++;
+                        else if (board[nr][nc] === null) break;
+                        else { blocks++; break; }
+                    }
+                }
+
+                // HỆ THỐNG ĐIỂM CỰC GẮT
+                if (count >= 5) total += 1000000; // Nước thắng
+                else if (count === 4) {
+                    total += (blocks === 0) ? 200000 : 50000; // 4 hở hoặc 4 bị chặn 1 đầu
+                } 
+                else if (count === 3) {
+                    // ƯU TIÊN CHẶN 3 HỞ ĐẦU TẠI ĐÂY
+                    total += (blocks === 0) ? 10000 : 500; 
+                }
+                else if (count === 2) {
+                    total += (blocks === 0) ? 100 : 10;
+                }
+            }
+            return total;
+        }
+
+        function checkWin(r, c, p) {
+            const directions = [[1,0], [0,1], [1,1], [1,-1]];
+            return directions.some(([dr, dc]) => {
+                let count = 1;
+                for (let side = -1; side <= 1; side += 2) {
+                    for (let i = 1; i < 5; i++) {
+                        let nr = r + (dr * i * side), nc = c + (dc * i * side);
+                        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === p) count++;
+                        else break;
+                    }
+                }
+                return count >= 5;
+            });
+        }
+
+        function resetGame() {
+            board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+            gameOver = false;
+            lastMove = null;
+            statusElement.innerText = "Trận đấu mới!";
+            createBoard();
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
