@@ -1,0 +1,274 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Siêu AI Lê Xuân Dương - Tournament V2.0</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f4f6f9; color: #222; margin: 0; padding: 10px; }
+        h1 { color: #1a1a1a; margin: 5px 0; text-transform: uppercase; letter-spacing: 1px; font-size: 18px; text-align: center;}
+        
+        .scoreboard {
+            display: flex; gap: 30px; background: #fff; padding: 10px 20px; border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 10px; border: 2px solid #2c3e50;
+        }
+        .score-item { text-align: center; }
+        .score-number { font-size: 26px; font-weight: 800; color: #2c3e50; }
+        .score-label { font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; }
+
+        #game-area { position: relative; }
+        #board { display: grid; grid-template-columns: repeat(20, 28px); grid-template-rows: repeat(20, 28px); gap: 1px; background-color: #2c3e50; border: 4px solid #2c3e50; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .cell { width: 28px; height: 28px; background-color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; cursor: pointer; position: relative;}
+        .cell:hover { background-color: #f1f2f6; }
+        .cell.x { color: #e74c3c; }
+        .cell.o { color: #3498db; }
+        .last-move { background-color: #fff9c4 !important; }
+
+        /* Đường gạch khi thắng */
+        #winning-line { position: absolute; background: none; border: 4px solid; border-radius: 4px; z-index: 10; display: none; pointer-events: none; }
+
+        #status { margin: 8px 0; font-size: 1rem; font-weight: bold; color: #2c3e50; height: 28px; text-align: center; }
+        
+        /* Loading overlay khi reset */
+        #loading-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 20; color: #2c3e50; font-size: 24px; font-weight: bold; justify-content: center; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <h1>Không thể đánh bại Lê Xuân Dương</h1>
+
+    <div class="scoreboard">
+        <div class="score-item">
+            <div class="score-label">Người chơi (X)</div>
+            <div id="human-score" class="score-number">0</div>
+        </div>
+        <div style="font-size: 20px; font-weight: bold; align-self: center;">-</div>
+        <div class="score-item">
+            <div class="score-label">Lê Xuân Dương AI (O)</div>
+            <div id="ai-score" class="score-number">0</div>
+        </div>
+    </div>
+
+    <div id="status">Ván đầu tiên: AI khai cuộc ở trung tâm!</div>
+    <div id="game-area">
+        <div id="board"></div>
+        <div id="winning-line"></div>
+        <div id="loading-overlay">Tạo ván mới sau 3s...</div>
+    </div>
+
+    <script>
+        const SIZE = 20;
+        let board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+        let gameOver = false;
+        let lastMove = null;
+        let humanScore = 0;
+        let aiScore = 0;
+        let isFirstMoveOfMatch = true; 
+        let winnerOfLastMatch = 'O'; 
+        let currentPlayer = 'O'; 
+
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const winLineElement = document.getElementById('winning-line');
+        const overlayElement = document.getElementById('loading-overlay');
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.id = `c-${r}-${c}`;
+                    cell.onclick = () => handleMove(r, c);
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function handleMove(r, c) {
+            if (board[r][c] || gameOver || currentPlayer === 'O') return;
+            isFirstMoveOfMatch = false;
+            makeMove(r, c, 'X');
+            if (handleWinChecks(r, c, 'X')) return;
+            currentPlayer = 'O';
+            statusElement.innerText = "AI đang suy nghĩ...";
+            setTimeout(aiMove, 200);
+        }
+
+        function makeMove(r, c, player) {
+            board[r][c] = player;
+            const cell = document.getElementById(`c-${r}-${c}`);
+            cell.innerText = player;
+            cell.classList.add(player.toLowerCase());
+            if (lastMove) document.getElementById(`c-${lastMove.r}-${lastMove.c}`).classList.remove('last-move');
+            cell.classList.add('last-move');
+            lastMove = {r, c};
+        }
+
+        function handleWinChecks(r, c, player) {
+            const winLine = checkWin(r, c, player);
+            if (winLine) {
+                gameOver = true;
+                drawWinLine(winLine, player);
+                let msg, winner;
+                if (player === 'X') {
+                    humanScore++;
+                    document.getElementById('human-score').innerText = humanScore;
+                    msg = "Kinh ngạc! Bạn thắng ván này.";
+                    winner = 'X';
+                } else {
+                    aiScore++;
+                    document.getElementById('ai-score').innerText = aiScore;
+                    msg = "Lê Xuân Dương AI đã thắng ván này!";
+                    winner = 'O';
+                }
+                statusElement.innerText = msg;
+                winnerOfLastMatch = winner;
+                setTimeout(prepareNextMatch, 3000); // 3s delay
+                return true;
+            }
+            return false;
+        }
+
+        function aiMove() {
+            if (gameOver) return;
+            let finalMove;
+
+            // NÂNG CẤP 1: Chống đánh góc. AI đi nước đầu tiên ở khu vực trung tâm (9x9 đến 11x11)
+            if (isFirstMoveOfMatch && currentPlayer === 'O') {
+                const min = 8, max = 12; // Khu vực 5x5 trung tâm
+                finalMove = {
+                    r: Math.floor(Math.random() * (max - min) + min),
+                    c: Math.floor(Math.random() * (max - min) + min)
+                };
+            } else {
+                let bestScore = -1, move = null, winMove = null, blockMove = null;
+                for (let r = 0; r < SIZE; r++) {
+                    for (let c = 0; c < SIZE; c++) {
+                        if (!board[r][c] && hasNearby(r, c)) {
+                            let aScore = evaluate(r, c, 'O'), dScore = evaluate(r, c, 'X');
+                            if (aScore >= 1000000) winMove = {r, c};
+                            if (dScore >= 1000000 && !blockMove) blockMove = {r, c};
+                            let totalScore = (aScore * 1.6) + (dScore * 1.1); // Nâng điểm phòng thủ chéo
+                            if (totalScore > bestScore) { bestScore = totalScore; move = {r, c}; }
+                        }
+                    }
+                }
+                finalMove = winMove || blockMove || move || {r: 10, c: 10};
+            }
+
+            isFirstMoveOfMatch = false;
+            makeMove(finalMove.r, finalMove.c, 'O');
+            if (handleWinChecks(finalMove.r, finalMove.c, 'O')) return;
+            currentPlayer = 'X';
+            statusElement.innerText = "Lượt của bạn!";
+        }
+
+        function evaluate(r, c, p) {
+            let total = 0;
+            const directions = [[1,0], [0,1], [1,1], [1,-1]];
+            for (let [dr, dc] of directions) {
+                let count = 1, blocks = 0;
+                for (let side = -1; side <= 1; side += 2) {
+                    for (let i = 1; i < 5; i++) {
+                        let nr = r + (dr * i * side), nc = c + (dc * i * side);
+                        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) { blocks++; break; }
+                        if (board[nr][nc] === p) count++;
+                        else if (board[nr][nc] === null) break;
+                        else { blocks++; break; }
+                    }
+                }
+                if (count >= 5) total += 1000000;
+                else if (count === 4) total += (blocks === 0) ? 400000 : 90000;
+                else if (count === 3) total += (blocks === 0) ? 30000 : 3000; // Chặn chéo 3 hở
+                else if (count === 2) total += (blocks === 0) ? 600 : 60;
+            }
+            return total;
+        }
+
+        function drawWinLine(line, player) {
+            const startCell = document.getElementById(`c-${line[0].r}-${line[0].c}`);
+            const endCell = document.getElementById(`c-${line[4].r}-${line[4].c}`);
+            const rectS = startCell.getBoundingClientRect();
+            const rectE = endCell.getBoundingClientRect();
+            const rectB = boardElement.getBoundingClientRect();
+
+            winLineElement.style.color = (player === 'X') ? '#e74c3c' : '#3498db';
+            winLineElement.style.borderColor = (player === 'X') ? '#e74c3c' : '#3498db';
+
+            const thickness = 4;
+            let top, left, width, angle = 0;
+
+            const c1 = {x: rectS.left + rectS.width/2, y: rectS.top + rectS.height/2};
+            const c2 = {x: rectE.left + rectE.width/2, y: rectE.top + rectE.height/2};
+
+            top = Math.min(c1.y, c2.y) - rectB.top - thickness/2;
+            left = Math.min(c1.x, c2.x) - rectB.left - thickness/2;
+            width = Math.sqrt(Math.pow(c2.x-c1.x, 2) + Math.pow(c2.y-c1.y, 2));
+
+            winLineElement.style.top = `${top}px`;
+            winLineElement.style.left = `${left}px`;
+            
+            if (line[0].r === line[4].r) { angle = 0; left -= width/2 - Math.abs(c2.x-c1.x)/2;} // Ngang
+            else if (line[0].c === line[4].c) { angle = 90; top -= width/2 - Math.abs(c2.y-c1.y)/2;} // Dọc
+            else if (line[0].r < line[4].r && line[0].c < line[4].c) { angle = 45; } // Chéo chính
+            else { angle = -45; top += Math.abs(c2.y-c1.y)/2 - thickness; left -= Math.abs(c2.x-c1.x)/2;} // Chéo phụ
+
+            winLineElement.style.width = `${width}px`;
+            winLineElement.style.height = '0px'; 
+            winLineElement.style.transform = `rotate(${angle}deg)`;
+            winLineElement.style.display = 'block';
+        }
+
+        function prepareNextMatch() {
+            overlayElement.style.display = 'flex';
+            setTimeout(resetGame, 3000);
+        }
+
+        function resetGame() {
+            overlayElement.style.display = 'none';
+            board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+            gameOver = false;
+            lastMove = null;
+            isFirstMoveOfMatch = true; 
+            winLineElement.style.display = 'none';
+            createBoard();
+            
+            currentPlayer = winnerOfLastMatch;
+            if (currentPlayer === 'X') {
+                statusElement.innerText = "Tuyệt vời, bạn thắng ván trước và được đi trước!";
+            } else {
+                statusElement.innerText = "Lê Xuân Dương AI tiếp tục khai cuộc...";
+                setTimeout(aiMove, 600);
+            }
+        }
+
+        function hasNearby(r, c) {
+            for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+                let nr = r + i, nc = c + j;
+                if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc]) return true;
+            }
+            return false;
+        }
+
+        function checkWin(r, c, p) {
+            const directions = [[1,0], [0,1], [1,1], [1,-1]];
+            for (let [dr, dc] of directions) {
+                let line = [{r, c}];
+                for (let side = -1; side <= 1; side += 2) {
+                    for (let i = 1; i < 5; i++) {
+                        let nr = r + (dr * i * side), nc = c + (dc * i * side);
+                        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === p) {
+                            if (side === -1) line.unshift({r: nr, c: nc}); else line.push({r: nr, c: nc});
+                        } else break;
+                    }
+                }
+                if (line.length >= 5) return line.slice(0, 5); // Trả về 5 ô thắng đầu tiên
+            }
+            return null;
+        }
+
+        createBoard();
+        resetGame();
+    </script>
+</body>
+</html>
